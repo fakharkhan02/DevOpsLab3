@@ -1,0 +1,111 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: mysql }
+  template:
+    metadata:
+      labels: { app: mysql }
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8
+          env:
+            - { name: MYSQL_DATABASE, value: laravel }
+            - { name: MYSQL_USER, value: laravel }
+            - name: MYSQL_PASSWORD
+              valueFrom: { secretKeyRef: { name: laravel-secret, key: DB_PASSWORD } }
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom: { secretKeyRef: { name: laravel-secret, key: MYSQL_ROOT_PASSWORD } }
+          ports:
+            - containerPort: 3306
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "mysqladmin ping -uroot -p$MYSQL_ROOT_PASSWORD"]
+            initialDelaySeconds: 20
+            periodSeconds: 5
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/mysql }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: mysql-pvc }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+spec:
+  selector: { app: mysql }
+  ports:
+    - port: 3306
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: laravel
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: laravel }
+  template:
+    metadata:
+      labels: { app: laravel }
+    spec:
+      volumes:
+        - name: code
+          emptyDir: {}
+      initContainers:
+        - name: fetch-code
+          image: composer:2
+          command: ["sh", "-c"]
+          args:
+            - >
+              git clone https://github.com/AhmedRaza02912/DevOpsLab3.git /app &&
+              cd /app &&
+              composer install --no-dev --optimize-autoloader --ignore-platform-reqs &&
+              chmod -R 777 storage bootstrap/cache
+          volumeMounts:
+            - { name: code, mountPath: /app }
+      containers:
+        - name: laravel
+          image: webdevops/php-apache:8.3
+          ports:
+            - containerPort: 80
+          env:
+            - { name: WEB_DOCUMENT_ROOT, value: /app/public }
+            - { name: DB_CONNECTION, value: mysql }
+            - { name: DB_HOST, value: mysql }
+            - { name: DB_PORT, value: "3306" }
+            - { name: DB_DATABASE, value: laravel }
+            - { name: DB_USERNAME, value: laravel }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: laravel-secret, key: DB_PASSWORD } }
+            - name: APP_KEY
+              valueFrom: { secretKeyRef: { name: laravel-secret, key: APP_KEY } }
+          volumeMounts:
+            - { name: code, mountPath: /app }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: laravel
+spec:
+  type: NodePort
+  selector: { app: laravel }
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30080
