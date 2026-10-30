@@ -3,7 +3,7 @@ pipeline {
   stages {
     stage('Checkout') {
       steps {
-        git branch: 'main', url: 'https://github.com/AhmedRaza02912/DevOpsLab3.git'
+        git branch: 'main', url: 'https://github.com/fakharkhan02/DevOpsLab3.git'
       }
     }
     stage('Deploy to Kubernetes') {

@@ -73,7 +73,7 @@ spec:
           command: ["sh", "-c"]
           args:
             - >
-              git clone https://github.com/AhmedRaza02912/DevOpsLab3.git /app &&
+              git clone https://github.com/fakharkhan02/DevOpsLab3.git /app &&
               cd /app &&
               composer install --no-dev --optimize-autoloader --ignore-platform-reqs &&
               chmod -R 777 storage bootstrap/cache
